@@ -2,7 +2,6 @@ streamlit
 pandas
 beautifulsoup4
 requests
-openai
 groq
 langdetect
 backoff

@@ -1,6 +1,5 @@
 import csv
 import logging
-from openai import OpenAI
 from groq import Groq
 import langdetect
 from dataclasses import dataclass
