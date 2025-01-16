@@ -131,7 +131,7 @@ class CSVProcessor:
         self.output_file = Path(output_file)
         self.scraper = URLScraper()
 
-    def validate_files(self) -> None:
+    def validate_files(self, expect_content: bool = False) -> None:
         if not self.input_file.exists():
             raise FileNotFoundError(f"Input file not found: {self.input_file}")
         if not self.input_file.suffix == '.csv':
@@ -140,39 +140,55 @@ class CSVProcessor:
         with open(self.input_file, 'r', encoding='utf-8') as infile:
             reader = csv.reader(infile)
             header = next(reader, None)
-            if not header or header[0].lower() != 'urls':
-                raise ValueError("CSV file must have 'urls' as the header in the first column")
+            if not header:
+                raise ValueError("CSV file must have a header row")
+                
+            if expect_content:
+                required_columns = {'url', 'scraped_content'}
+                header_set = {col.lower() for col in header}
+                missing = required_columns - header_set
+                if missing:
+                    raise ValueError(f"CSV file missing required columns: {', '.join(missing)}")
+            else:
+                if not header or header[0].lower() != 'urls':
+                    raise ValueError("CSV file must have 'urls' as the header in the first column")
 
-    def process(self) -> None:
+    def process(self, expect_content: bool = False) -> None:
         try:
-            self.validate_files()
+            self.validate_files(expect_content)
             output_data = []
-            total_urls = sum(1 for _ in open(self.input_file)) - 1
-
-            urls = []
+            
             with open(self.input_file, 'r', newline='', encoding='utf-8') as infile:
-                reader = csv.reader(infile)
-                next(reader)
-                logger.info("Processing URLs from CSV (header: 'urls')")
-                for row in reader:
-                    if row and row[0].strip():
-                        urls.append(row[0].strip())
+                reader = csv.DictReader(infile)
+                total_rows = sum(1 for _ in open(self.input_file)) - 1
+                
+                if expect_content:
+                    logger.info("Processing pre-scraped content from CSV")
+                    for row in reader:
+                        output_data.append({
+                            'url': row['url'],
+                            'scraped_content': row['scraped_content']
+                        })
+                else:
+                    logger.info("Processing URLs from CSV (header: 'urls')")
+                    for i, row in enumerate(reader):
+                        url = row[reader.fieldnames[0]].strip()
+                        if url:
+                            logger.info(f'Processing URL {i + 1}/{total_rows}: {url}')
+                            scraped_content = self.scraper.scrape_url(url)
+                            output_data.append({
+                                'url': url,
+                                'scraped_content': scraped_content
+                            })
+                            logger.info(f'Current output data size: {len(output_data)}')
 
-            for i, url in enumerate(urls):
-                    logger.info(f'Processing URL {i + 1}/{total_urls}: {url}')
-                    
-                    scraped_content = self.scraper.scrape_url(url)
-                    logger.info(f'Adding to output data - URL: {url}')
-                    output_data.append({'url': url, 'scraped_content': scraped_content})
-                    logger.info(f'Current output data size: {len(output_data)}')
-
-            logger.info(f'Writing {len(output_data)} URLs to CSV')
+            logger.info(f'Writing {len(output_data)} entries to CSV')
             with open(self.output_file, 'w', newline='', encoding='utf-8') as outfile:
                 writer = csv.DictWriter(outfile, fieldnames=['url', 'scraped_content'])
                 writer.writeheader()
                 for data in output_data:
                     writer.writerow(data)
-            logger.info(f'Scraped data saved to {self.output_file}')
+            logger.info(f'Data saved to {self.output_file}')
 
             self._run_metadata_generator()
 
@@ -199,8 +215,15 @@ class CSVProcessor:
 
 def main():
     try:
-        processor = CSVProcessor('inputtoscrape.csv', 'scraped_content.csv')
-        processor.process()
+        import argparse
+        parser = argparse.ArgumentParser(description='Process URLs or pre-scraped content')
+        parser.add_argument('--input', default='inputtoscrape.csv', help='Input CSV file path')
+        parser.add_argument('--output', default='scraped_content.csv', help='Output CSV file path')
+        parser.add_argument('--pre-scraped', action='store_true', help='Input CSV contains pre-scraped content')
+        args = parser.parse_args()
+        
+        processor = CSVProcessor(args.input, args.output)
+        processor.process(expect_content=args.pre_scraped)
     except Exception as e:
         logger.error(f"Script failed: {str(e)}")
         sys.exit(1)

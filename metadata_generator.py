@@ -10,6 +10,22 @@ import sys
 import json
 from tqdm import tqdm
 import os
+import time
+import random
+
+class RateLimiter:
+    def __init__(self, min_delay: int = 1, max_delay: int = 5):
+        self.min_delay = min_delay
+        self.max_delay = max_delay
+        self.last_request_time = 0
+
+    def wait(self) -> None:
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        if time_since_last_request < self.min_delay:
+            delay = random.uniform(self.min_delay, self.max_delay)
+            time.sleep(delay)
+        self.last_request_time = time.time()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +79,7 @@ class MetadataProcessor:
         self.client = Groq(
             api_key=os.getenv("GROQ_API_KEY")
         )
+        self.rate_limiter = RateLimiter(min_delay=3, max_delay=5)  # Add delay between API calls
 
     @staticmethod
     def truncate_summary(summary: str, max_length: int = 250) -> str:
@@ -84,6 +101,7 @@ class MetadataProcessor:
         temperature: float,
         model_name: str = None
     ) -> str:
+        self.rate_limiter.wait()  # Add rate limiting between API calls
         try:
             response = self.client.chat.completions.create(
                 model=model_name or self.config.model_name,
@@ -155,8 +173,7 @@ class MetadataProcessor:
             "1. Relevance to content\n"
             "2. Search engine optimization effectiveness\n"
             "3. Keyword density and placement\n"
-            "4. User engagement potential\n"
-            "5. Competitive advantage in search results\n\n"
+            "4. User engagement potential\n\n"
             "Provide specific, actionable recommendations for improvements. If the metadata is already optimal, explain why.\n\n"
             f"Content: {content}\n\n"
             f"Current Meta Description: {description}\n\n"
@@ -258,6 +275,7 @@ def main():
                         continue
 
         logger.info(f'Metadata generation completed. Results saved to {csv_handler.output_path}')
+        sys.exit(0)  # Explicitly exit after completion
         
     except Exception as e:
         logger.error(f"Script failed: {str(e)}")
