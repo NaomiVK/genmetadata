@@ -38,7 +38,7 @@ class RateLimiter:
 class URLScraper:
     def __init__(self):
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; CRA-data-usability-script/v1.0/0.00; +; )'
+           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         self.rate_limiter = RateLimiter()
         self.allowed_tags = ['h1', 'h2', 'h3', 'h4', 'p']
