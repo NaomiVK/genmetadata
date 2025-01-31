@@ -92,7 +92,7 @@ def generate_metadata(scraped_df, progress_bar, status_text, model_status):
                     
                     recommendations = processor.review_metadata(scraped_content, description, keywords)
                     
-                    st.text("SEO Expert Recommendations:")
+                    st.text("SEO Recommendations:")
                     st.code(recommendations)
                 
                 results.append({
